@@ -42,121 +42,54 @@
         .interactive-elements {
             margin-top: 30px;
         }
-
-        .interactive-elements input, .interactive-elements select {
-            padding: 10px;
-            margin: 5px;
-            font-size: 14px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-        }
     </style>
-
-    <script defer src="https://g.3gl.net/jp/12603/latest/InitialLoadScript.js"></script>
-
 </head>
 <body>
 
 <div class="container">
     <h1>Welcome to the Interactive Website</h1>
+    <button class="btn" onclick="initializeRUM()">Initialize RUM</button>
     <button class="btn" onclick="trigger404()">Click Me for 404 Error</button>
-    
-    <div class="interactive-elements">
-        <h3>Other Interactive Elements</h3>
-
-        <label for="name">Enter Your Name:</label>
-        <input type="text" id="name" placeholder="Type your name">
-
-        <label for="color">Choose a Color:</label>
-        <select id="color">
-            <option value="red">Red</option>
-            <option value="blue">Blue</option>
-            <option value="green">Green</option>
-        </select>
-
-        <button class="btn" onclick="changeColor()">Change Color</button>
-
-        <button class="btn" onclick="triggerPageRedirect()">Go to 404 Page</button>
-        <div id="newRequestOutput" style="margin-top: 10px; font-size: 16px;"></div>
-    </div>
 </div>
 
 <script>
-    // Function to change background color based on selection
-    function changeColor() {
-        const selectedColor = document.getElementById('color').value;
-        document.body.style.backgroundColor = selectedColor;
+    let rumInitialized = false;
+
+    function initializeRUM() {
+        if (!rumInitialized) {
+            let script = document.createElement("script");
+            script.src = "https://g.3gl.net/jp/12603/latest/InitialLoadScript.js";
+            script.defer = true;
+            script.onload = function () {
+                if (window.RUM) {
+                    console.log("✅ RUM Loaded Successfully!");
+                    rumInitialized = true;
+                } else {
+                    console.error("❌ RUM failed to load!");
+                }
+            };
+            document.head.appendChild(script);
+        } else {
+            console.log("⚠️ RUM already initialized!");
+        }
     }
 
-    // Hook into all network errors (Images, Scripts, etc.)
-    window.addEventListener("error", function(event) {
-        if (event.target instanceof HTMLImageElement || event.target instanceof HTMLScriptElement) {
-            console.warn("404 Error Detected:", event.target.src);
-            
-            // Send error to RUM
-            if (window.RUM && typeof window.RUM.trackEvent === "function") {
-                window.RUM.trackEvent("404 Error", {
-                    url: event.target.src,
-                    type: "resource"
-                });
-            }
+    function trigger404() {
+        if (!rumInitialized) {
+            console.warn("⚠️ RUM not initialized. Initializing now...");
+            initializeRUM();
         }
-    }, true);
-
-    // Intercept fetch() and check for 404 errors
-    (function() {
-        const originalFetch = window.fetch;
-        window.fetch = async function(...args) {
-            const response = await originalFetch(...args);
-            if (!response.ok && response.status === 404) {
-                console.warn("404 Fetch Error:", args[0]);
-
-                // Send error to RUM
-                if (window.RUM && typeof window.RUM.trackEvent === "function") {
-                    window.RUM.trackEvent("404 Error", {
-                        url: args[0],
-                        status: response.status,
-                        type: "fetch"
-                    });
-                }
-            }
-            return response;
-        };
-    })();
-
-    // Intercept XMLHttpRequest and check for 404 responses
-    (function() {
-        const originalOpen = XMLHttpRequest.prototype.open;
-        XMLHttpRequest.prototype.open = function(method, url, ...args) {
-            this.addEventListener("load", function() {
-                if (this.status === 404) {
-                    console.warn("404 XHR Error:", url);
-
-                    // Send error to RUM
+        fetch("https://telladheerajnaidu.github.io/nonexistent-resource.jpg")
+            .then(response => {
+                if (!response.ok) {
+                    console.error("404 Error Detected:", response.url);
                     if (window.RUM && typeof window.RUM.trackEvent === "function") {
-                        window.RUM.trackEvent("404 Error", {
-                            url: url,
-                            status: this.status,
-                            type: "xhr"
-                        });
+                        window.RUM.trackEvent("error", { url: response.url, status: response.status });
+                        console.log("📡 Sent to RUM: 404 Error", response.url);
                     }
                 }
-            });
-            return originalOpen.call(this, method, url, ...args);
-        };
-    })();
-
-    // Function to simulate a 404 request from within the page
-    function trigger404() {
-        const testUrl = "/nonexistent-resource.jpg"; // Change this to an actual missing resource
-        const img = document.createElement("img");
-        img.src = testUrl;
-        document.body.appendChild(img);
-    }
-
-    // Function to simulate redirection to a 404 page and log the event
-    function triggerPageRedirect() {
-        trigger404();
+            })
+            .catch(error => console.error("Fetch error:", error));
     }
 </script>
 
